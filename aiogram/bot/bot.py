@@ -18,16 +18,55 @@ dp = Dispatcher(bot)
 @dp.message_handler(commands='get_brand')
 async def start_get_brand(message: types.Message):
     art = message.text.split(" ")[1]
-    response = requests.get(f'https://www.wildberries.ru/catalog/{art}/detail.aspx?targetUrl=XS').text
+    response = requests.get(f'https://wbx-content-v2.wbstatic.net/other-sellers/{art}.json?locale=ru').text
+    if len(response[1:-1].split(", ")) > 1:
+        p_id = ";".join([str(i) for i in response[1:-1].split(", ")])
+    else:
+        p_id = response[1:-1]
+    response_json = requests.get(f'https://wbxcatalog-ru.wildberries.ru/nm-2-card/catalog?locale=ru&nm={p_id}').text
+    json_asw = (loads(response_json).get("data").get("products")[0].get("brand"))
     try:
-        json_data = re.findall(r'var google_tag_params = ({[\d\D]+?});\s', response)[0]
-        await message.answer(loads(json_data).get("Pbrand"))
+        await message.answer(json_asw)
     except IndexError:
-        await message.answer('Продукции с таким артикулом не существует')
+        await bot.send_message('Продукции с таким артикулом не существует')
+    # response = requests.get(f'https://www.wildberries.ru/catalog/{art}/detail.aspx?targetUrl=XS').text
+    # try:
+    #     json_data = re.findall(r'var google_tag_params = ({[\d\D]+?});\s', response)[0]
 
 
+@dp.message_handler(commands='get_title')
+async def start_get_title(message: types.Message):
+    art = message.text.split(" ")[1]
+    response = requests.get(f'https://wbx-content-v2.wbstatic.net/other-sellers/{art}.json?locale=ru').text
+    if len(response[1:-1].split(", ")) > 1:
+        p_id = ";".join([str(i) for i in response[1:-1].split(", ")])
+    else:
+        p_id = response[1:-1]
+    response_json = requests.get(f'https://wbxcatalog-ru.wildberries.ru/nm-2-card/catalog?locale=ru&nm={p_id}').text
+    json_asw = (loads(response_json).get("data").get("products")[0].get("name"))
+    try:
+        await message.answer(json_asw)
+    except IndexError:
+        await bot.send_message('Продукции с таким артикулом не существует')
 
+    # response = requests.get(f'https://www.wildberries.ru/catalog/{art}/detail.aspx?targetUrl=XS').text
+    # print(response)
+    # try:
+    #     json_data = re.findall(r'var google_tag_params = ({[\d\D]+?});\s', response)[0]
+    #     await message.answer(loads(json_data).get("Ptype")[0])
+    # except IndexError:
+    #     await message.answer('Продукции с таким артикулом не существует')
 
+# @dp.message_handler(commands='get_all')
+# async def start_get_brand(message: types.Message):
+#     art = message.text.split(" ")[1]
+#     response = requests.get(f'https://wbx-content-v2.wbstatic.net/other-sellers/{art}.json?locale=ru').text
+#     response_json = requests.get(f'https://wbxcatalog-ru.wildberries.ru/nm-2-card/catalog?locale=ru&nm=\
+#     {";".join([str(i) for i in response[1:-1].split(", ")])}').text
+#     print(response_json)
+#     print(loads(response_json))
+#     json_asw = (loads(response_json).get("data"))
+#     print(json_asw)
 
 if __name__ == '__main__':
     executor.start_polling(dp, skip_updates=True)

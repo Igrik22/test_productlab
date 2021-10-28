@@ -1,9 +1,9 @@
 import logging
-import re
 from json import loads
 
 import requests
 from aiogram import Bot, Dispatcher, executor, types
+from data_base import sqlite_db
 
 API_TOKEN = '2063505505:AAFBOL9l7sEumsjUHKPDXy8ck1fqdZH0zjQ'
 
@@ -15,20 +15,34 @@ bot = Bot(token=API_TOKEN)
 dp = Dispatcher(bot)
 
 
-@dp.message_handler(commands='get_brand')
-async def start_get_brand(message: types.Message):
-    art = message.text.split(" ")[1]
+async def start_bot():
+    print('Bot online')
+    sqlite_db.start_db()
+
+
+def start_get_all(value):
+    art = value.text.split(" ")[1]
     response = requests.get(f'https://wbx-content-v2.wbstatic.net/other-sellers/{art}.json?locale=ru').text
     if len(response[1:-1].split(", ")) > 1:
         p_id = ";".join([str(i) for i in response[1:-1].split(", ")])
     else:
         p_id = response[1:-1]
     response_json = requests.get(f'https://wbxcatalog-ru.wildberries.ru/nm-2-card/catalog?locale=ru&nm={p_id}').text
-    json_asw = (loads(response_json).get("data").get("products")[0].get("brand"))
+    brand = (loads(response_json).get("data").get("products")[0].get("brand"))
+    title = (loads(response_json).get("data").get("products")[0].get("name"))
+    sqlite_db.start_db()
+    sqlite_db.sql_add_brand_and_title(title, brand)
+    return title, brand
+
+
+@dp.message_handler(commands='get_brand')
+async def start_get_brand(message: types.Message):
+    json_asw = start_get_all(message)
     try:
-        await message.answer(json_asw)
+        await message.answer(json_asw[1])
     except IndexError:
-        await bot.send_message('Продукции с таким артикулом не существует')
+        await message.answer('Продукции с таким артикулом не существует')
+
     # response = requests.get(f'https://www.wildberries.ru/catalog/{art}/detail.aspx?targetUrl=XS').text
     # try:
     #     json_data = re.findall(r'var google_tag_params = ({[\d\D]+?});\s', response)[0]
@@ -36,19 +50,14 @@ async def start_get_brand(message: types.Message):
 
 @dp.message_handler(commands='get_title')
 async def start_get_title(message: types.Message):
-    art = message.text.split(" ")[1]
-    response = requests.get(f'https://wbx-content-v2.wbstatic.net/other-sellers/{art}.json?locale=ru').text
-    if len(response[1:-1].split(", ")) > 1:
-        p_id = ";".join([str(i) for i in response[1:-1].split(", ")])
-    else:
-        p_id = response[1:-1]
-    response_json = requests.get(f'https://wbxcatalog-ru.wildberries.ru/nm-2-card/catalog?locale=ru&nm={p_id}').text
-    json_asw = (loads(response_json).get("data").get("products")[0].get("name"))
+    json_asw = start_get_all(message)
     try:
-        await message.answer(json_asw)
+        await message.answer(json_asw[0])
     except IndexError:
-        await bot.send_message('Продукции с таким артикулом не существует')
+        await message.answer('Продукции с таким артикулом не существует')
 
+if __name__ == '__main__':
+    executor.start_polling(dp, skip_updates=True)
     # response = requests.get(f'https://www.wildberries.ru/catalog/{art}/detail.aspx?targetUrl=XS').text
     # print(response)
     # try:
@@ -68,6 +77,5 @@ async def start_get_title(message: types.Message):
 #     json_asw = (loads(response_json).get("data"))
 #     print(json_asw)
 
-if __name__ == '__main__':
-    executor.start_polling(dp, skip_updates=True)
+
     

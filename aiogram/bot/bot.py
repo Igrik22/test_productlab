@@ -1,11 +1,12 @@
 import logging
 from json import loads
+from config import API_TOKEN
 
 import requests
 from aiogram import Bot, Dispatcher, executor, types
 from data_base import sqlite_db
+from keyboards import urlkb, colkb
 
-API_TOKEN = '2063505505:AAFBOL9l7sEumsjUHKPDXy8ck1fqdZH0zjQ'
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -15,33 +16,47 @@ bot = Bot(token=API_TOKEN)
 dp = Dispatcher(bot)
 
 
-async def start_bot():
-    print('Bot online')
-    sqlite_db.start_db()
+@dp.message_handler(commands='start')
+async def send_welcome(message: types.Message):
+    """
+    This handler will be called when user sends `/start` or `/help` command
+    """
+    await message.reply("Hi!\nI'm WildParserBot!\nI can get the brand name or product name\
+                        \nWe will parse from wildberries:", reply_markup=urlkb)
+    await message.reply('if you want to know how to do it\nclick help', reply_markup=colkb)
 
 
-def start_get_all(value):
-    art = value.text.split(" ")[1]
-    response = requests.get(f'https://wbx-content-v2.wbstatic.net/other-sellers/{art}.json?locale=ru').text
-    if len(response[1:-1].split(", ")) > 1:
-        p_id = ";".join([str(i) for i in response[1:-1].split(", ")])
-    else:
-        p_id = response[1:-1]
-    response_json = requests.get(f'https://wbxcatalog-ru.wildberries.ru/nm-2-card/catalog?locale=ru&nm={p_id}').text
-    brand = (loads(response_json).get("data").get("products")[0].get("brand"))
-    title = (loads(response_json).get("data").get("products")[0].get("name"))
-    sqlite_db.start_db()
-    sqlite_db.sql_add_brand_and_title(title, brand)
-    return title, brand
+@dp.callback_query_handler(text='www')
+async def send_help(callback: types.CallbackQuery):
+    await callback.message.answer('to get the name of the product, you must write the command "/get_title" and specify\
+    the SKU after a space\nto get the brand of the product, use the command "/get_brand"')
+
+
+def get_all(value):
+    try:
+        art = value.text.split(" ")[1]
+        response = requests.get(f'https://wbx-content-v2.wbstatic.net/other-sellers/{art}.json?locale=ru').text
+        if len(response[1:-1].split(", ")) > 1:
+            p_id = ";".join([str(i) for i in response[1:-1].split(", ")])
+        else:
+            p_id = response[1:-1]
+        response_json = requests.get(f'https://wbxcatalog-ru.wildberries.ru/nm-2-card/catalog?locale=ru&nm={p_id}').text
+        brand = (loads(response_json).get("data").get("products")[0].get("brand"))
+        title = (loads(response_json).get("data").get("products")[0].get("name"))
+        sqlite_db.start_db()
+        sqlite_db.sql_add_brand_and_title(title, brand)
+        return title, brand
+    except IndexError:
+        print('Товара с таким артикулом не существует')
 
 
 @dp.message_handler(commands='get_brand')
-async def start_get_brand(message: types.Message):
-    json_asw = start_get_all(message)
+async def get_brand(message: types.Message):
+    json_asw = get_all(message)
     try:
         await message.answer(json_asw[1])
-    except IndexError:
-        await message.answer('Продукции с таким артикулом не существует')
+    except TypeError:
+        await message.answer('Введите верный артикул товара')
 
     # response = requests.get(f'https://www.wildberries.ru/catalog/{art}/detail.aspx?targetUrl=XS').text
     # try:
@@ -49,12 +64,12 @@ async def start_get_brand(message: types.Message):
 
 
 @dp.message_handler(commands='get_title')
-async def start_get_title(message: types.Message):
-    json_asw = start_get_all(message)
+async def get_title(message: types.Message):
+    json_asw = get_all(message)
     try:
         await message.answer(json_asw[0])
-    except IndexError:
-        await message.answer('Продукции с таким артикулом не существует')
+    except TypeError:
+        await message.answer('Введите верный артикул товара')
 
 if __name__ == '__main__':
     executor.start_polling(dp, skip_updates=True)
